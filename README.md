@@ -29,6 +29,15 @@
 > Every website a user visits is fetched, executed, and rendered inside a disposable browser **on our server**. Only a live image of the result is streamed back. The user keeps their normal browser and habits — no plugin, no manual steps.
 
 ---
+## 📐 Architecture & System Design
+
+Explore the full interactive design briefing — architecture, user flow, and the terminal/OS/browser workflow:
+
+<div align="center">
+
+[![View Architecture](https://img.shields.io/badge/📐_View_Live_Architecture-Open_Briefing-7a4a2b?style=for-the-badge&labelColor=2f6f6a)](https://krithiikaa.github.io/Precision-RBI-Docker/)
+
+</div>
 
 ## ✨ What it does
 
