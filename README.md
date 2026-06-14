@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Precision-RBI
 
 A Remote Browser Isolation (RBI) system. Browsers run on **your server**; the
@@ -64,3 +65,6 @@ REDIS_URL=redis://localhost:6379/0 BROWSER_HOST_URL=http://localhost:9000 \
 - Replace `DEMO_USERS` with a real IdP/OIDC and a user database.
 - Add download scanning (ClamAV/CDR) before releasing files to the user.
 - Recycle browser contexts per session (already done on release).
+=======
+# Precision-RBI-Docker
+>>>>>>> 5cd97dfee7aeb641ed8731dffb9ca8dffeb344f7
