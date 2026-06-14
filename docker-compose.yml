@@ -1,0 +1,52 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./logging/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+      - ch_data:/var/lib/clickhouse
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+
+  browser-host:
+    build: ./browser-host
+    restart: unless-stopped
+    # Outbound internet only; not publicly exposed.
+    expose:
+      - "9000"
+    shm_size: "1gb"
+    # For stronger isolation in prod, add: runtime: runsc  (gVisor)
+
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    depends_on: [redis, clickhouse, browser-host]
+    environment:
+      JWT_SECRET: "${JWT_SECRET:-please-change-me}"
+      REDIS_URL: "redis://redis:6379/0"
+      BROWSER_HOST_URL: "http://browser-host:9000"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: "rbi"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin123}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+    ports:
+      - "8000:8000"
+
+  proxy:
+    build: ./proxy
+    restart: unless-stopped
+    depends_on: [gateway, browser-host]
+    ports:
+      - "8080:8080"          # browsers point here via PAC/MDM
+    volumes:
+      - mitm_ca:/root/.mitmproxy   # stable CA across restarts
+
+volumes:
+  ch_data:
+  mitm_ca:

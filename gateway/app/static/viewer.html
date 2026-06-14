@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Precision-RBI</title>
+<style>
+ html,body{margin:0;height:100%;background:#000;overflow:hidden}
+ #c{display:block;width:100vw;height:100vh;object-fit:contain;background:#000}
+ #s{position:fixed;top:6px;left:8px;color:#8b909a;font:12px system-ui;z-index:9}
+</style></head><body>
+<div id="s">connecting…</div>
+<canvas id="c" width="1280" height="800" tabindex="0"></canvas>
+<script>
+const qs=new URLSearchParams(location.search);
+const target=qs.get('target');
+const gw=location.origin;
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const status=document.getElementById('s');
+let ws, browserId;
+
+async function start(){
+  // ask gateway to lease an isolated browser for this device
+  const ip='';  // gateway resolves real IP from the request
+  const r=await fetch('/portal/session',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({ip:ip})});
+  if(!r.ok){status.textContent='not authenticated — open any site to sign in';return;}
+  const j=await r.json(); browserId=j.browser_id;
+  connect();
+}
+
+function connect(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/streamproxy/${browserId}`);
+  ws.onopen=()=>{status.textContent='secure session';
+    ws.send(JSON.stringify({type:'navigate',url:target}));};
+  ws.onmessage=(e)=>{
+    const m=JSON.parse(e.data);
+    if(m.type==='frame'){
+      const img=new Image();
+      img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      img.src='data:image/jpeg;base64,'+m.data;
+    }
+  };
+  ws.onclose=()=>{status.textContent='disconnected';};
+}
+
+function pos(ev){
+  const rb=canvas.getBoundingClientRect();
+  const sx=canvas.width/rb.width, sy=canvas.height/rb.height;
+  return {x:Math.round((ev.clientX-rb.left)*sx), y:Math.round((ev.clientY-rb.top)*sy)};
+}
+function send(o){ if(ws&&ws.readyState===1) ws.send(JSON.stringify(o)); }
+
+canvas.addEventListener('mousedown',e=>{const p=pos(e);
+  send({type:'mouse',action:'mousePressed',x:p.x,y:p.y,button:'left',clickCount:1});});
+canvas.addEventListener('mouseup',e=>{const p=pos(e);
+  send({type:'mouse',action:'mouseReleased',x:p.x,y:p.y,button:'left',clickCount:1});});
+canvas.addEventListener('mousemove',e=>{const p=pos(e);
+  send({type:'mouse',action:'mouseMoved',x:p.x,y:p.y});});
+canvas.addEventListener('wheel',e=>{const p=pos(e);e.preventDefault();
+  send({type:'mouse',action:'mouseWheel',x:p.x,y:p.y,deltaX:e.deltaX,deltaY:e.deltaY});},
+  {passive:false});
+canvas.addEventListener('keydown',e=>{e.preventDefault();
+  send({type:'key',action:'keyDown',key:e.key,code:e.code,
+    text:e.key.length===1?e.key:''});});
+canvas.addEventListener('keyup',e=>{e.preventDefault();
+  send({type:'key',action:'keyUp',key:e.key,code:e.code});});
+canvas.focus();
+start();
+</script></body></html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Precision-RBI</title>
+<style>
+  :root{--bg:#0f1115;--panel:#1a1d24;--accent:#4f8cff;--text:#e6e8ec;--muted:#8b909a;}
+  *{box-sizing:border-box;font-family:system-ui,sans-serif}
+  body{margin:0;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
+  #login{margin:auto;background:var(--panel);padding:32px;border-radius:12px;width:320px}
+  #login h1{font-size:18px;margin:0 0 16px}
+  input{width:100%;padding:10px;margin:6px 0;border-radius:8px;border:1px solid #2a2e37;background:#12141a;color:var(--text)}
+  button{background:var(--accent);color:#fff;border:0;padding:10px 16px;border-radius:8px;cursor:pointer}
+  #app{display:none;flex-direction:column;height:100%}
+  #bar{display:flex;gap:8px;padding:10px;background:var(--panel);align-items:center}
+  #bar input{margin:0;flex:1}
+  #status{font-size:12px;color:var(--muted);padding:4px 10px}
+  #view{flex:1;border:0;width:100%;background:#fff}
+  #pixel{flex:1;width:100%;display:none;background:#000}
+</style>
+</head>
+<body>
+  <div id="login">
+    <h1>Precision-RBI Login</h1>
+    <input id="u" placeholder="username" value="admin"/>
+    <input id="p" type="password" placeholder="password" value="admin123"/>
+    <button onclick="login()">Sign in (once)</button>
+    <p id="lerr" style="color:#ff6b6b;font-size:12px"></p>
+  </div>
+
+  <div id="app">
+    <div id="bar">
+      <input id="addr" placeholder="Type a URL — it is fetched by the server, never your device"
+             onkeydown="if(event.key==='Enter')go()"/>
+      <button onclick="go()">Go</button>
+    </div>
+    <div id="status">disconnected</div>
+    <iframe id="view" sandbox="allow-same-origin"></iframe>
+    <img id="pixel" alt="remote stream"/>
+  </div>
+
+<script>
+let ws=null;
+
+async function login(){
+  const r=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:u.value,password:p.value})});
+  if(!r.ok){lerr.textContent='Invalid credentials';return;}
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='flex';
+  connect();
+}
+
+function connect(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen =()=>status.textContent='connected';
+  ws.onclose=()=>{status.textContent='disconnected — retrying';setTimeout(reauthAndConnect,1500);};
+  ws.onmessage=(e)=>{
+    const m=JSON.parse(e.data);
+    if(m.type==='ready') status.textContent='isolated browser ready: '+m.browser_id;
+    if(m.type==='render') render(m);
+  };
+}
+
+async function reauthAndConnect(){
+  await fetch('/auth/refresh',{method:'POST'}); // silent, no prompt
+  connect();
+}
+
+function go(){
+  if(!ws||ws.readyState!==1)return;
+  ws.send(JSON.stringify({type:'navigate',url:addr.value}));
+  status.textContent='loading via Precision-RBI…';
+}
+
+function render(m){
+  const view=document.getElementById('view');
+  const pix=document.getElementById('pixel');
+  if(m.mode==='dom'){
+    pix.style.display='none'; view.style.display='block';
+    view.srcdoc=m.content||'';
+    status.textContent='rendered (DOM-mirror) · '+(m.final_url||'');
+  }else if(m.mode==='pixel'){
+    view.style.display='none'; pix.style.display='block';
+    pix.src=m.stream_url||m.content;
+    status.textContent='rendered (pixel-fallback) · '+(m.final_url||'');
+  }
+}
+</script>
+</body>
+</html>
